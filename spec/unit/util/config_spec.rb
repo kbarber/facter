@@ -37,6 +37,8 @@ describe Facter::Util::Config do
 
   describe "cache_file attribute" do
     around :each do |example|
+      # Wipe out the cache file around each run to ensure
+      # we have no side-effects
       Facter::Util::Config.cache_file = nil
       example.run
       Facter::Util::Config.cache_file = nil
@@ -51,26 +53,26 @@ describe Facter::Util::Config do
     it "should return the default value for mac" do
       Facter::Util::Config.stubs(:is_windows?).returns(false)
       Facter::Util::Config.stubs(:is_mac?).returns(true)
-      Facter::Util::Config.cache_file.should == "/var/db/facter_cache.dat"
+      Facter::Util::Config.cache_file.should == "/var/db/facter_cache.yaml"
     end
 
     it "should return the default value for linux" do
       Facter::Util::Config.stubs(:is_windows?).returns(false)
       Facter::Util::Config.stubs(:is_mac?).returns(false)
-      Facter::Util::Config.cache_file.should == "/var/cache/facter_cache.dat"
+      Facter::Util::Config.cache_file.should == "/var/cache/facter_cache.yaml"
     end
 
     it "should return the default value for windows 2008" do
       Facter::Util::Config.stubs(:is_windows?).returns(true)
       ENV.stubs(:[]).with("ProgramData").returns("C:\\ProgramData")
-      Facter::Util::Config.cache_file.should == "C:\\ProgramData/Puppetlabs/facter/cache/facter_cache.dat"
+      Facter::Util::Config.cache_file.should == "C:\\ProgramData/Puppetlabs/facter/cache/facter_cache.yaml"
     end
 
     it "should return the default value for windows 2003R2" do
       Facter::Util::Config.stubs(:is_windows?).returns(true)
       ENV.stubs(:[]).with("ProgramData").returns(nil)
       ENV.stubs(:[]).with("ALLUSERSPROFILE").returns("C:\\Documents and Settings\\All Users")
-      Facter::Util::Config.cache_file.should == "C:\\Documents and Settings\\All Users/Application Data/Puppetlabs/facter/cache/facter_cache.dat"
+      Facter::Util::Config.cache_file.should == "C:\\Documents and Settings\\All Users/Application Data/Puppetlabs/facter/cache/facter_cache.yaml"
     end
   end
 

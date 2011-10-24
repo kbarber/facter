@@ -35,10 +35,13 @@ class Facter::Util::Loader
   def load_all
     return if defined?(@loaded_all)
 
+    # First load facts from environment variables
     load_env
 
+    # Load external facts next
     directory_loader.load
 
+    # Now load ruby facts
     search_path.each do |dir|
       next unless FileTest.directory?(dir)
 

@@ -92,25 +92,20 @@ class Facter::Util::Parser
     starttime = Time.now.to_f
 
     from_cache = false
-    result = begin
-      Facter::Util::Cache.get(filename,ttl)
-    rescue Exception => e
-      :noentry
-    end
 
-    if result != :noentry
-      # Use cache results if they exist
-      Facter.debug("Using cached data for #{filename}")
-      return_values = result
-      from_cache = true
-    else
-      # Run external fact and optionally cache results
+    cache = Facter.cache
+
+    return_values = cache.get(filename,ttl)
+
+    if return_values == :noentry then
       return_values = results
 
       if return_values
-        Facter.debug("Updating cache for #{filename}")
-        Facter::Util::Cache.set(filename,return_values,ttl)
+        # TODO: Catch exceptions
+        cache.set(filename,return_values,ttl)
       end
+    else
+      from_cache = true
     end
 
     finishtime = Time.now.to_f
