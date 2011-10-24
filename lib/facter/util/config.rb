@@ -34,23 +34,24 @@ module Facter::Util::Config
   end
 
   # Cache path attribute
-  attr_accessor :cache_file
+  attr_accessor :cache_dir
 
   # Retrieve the cache file path
-  def self.cache_file
+  def self.cache_dir
     if is_windows?
-      @@cache_file ||= File.join(windows_data_dir, "cache/facter_cache.dat")
+      # TODO: this still valid for windows now its a dir?
+      @@cache_dir ||= File.join(windows_data_dir, "cache/facter/")
     elsif is_mac?
-      @@cache_file ||= "/var/db/facter_cache.dat"
+      @@cache_dir ||= "/var/db/facter/cache/"
     else
-      @@cache_file ||= "/var/cache/facter_cache.dat"
+      @@cache_dir ||= "/var/cache/facter/"
     end
-    @@cache_file
+    @@cache_dir
   end
 
   # Set the current cache file path
-  def self.cache_file=(path)
-    @@cache_file = path
+  def self.cache_dir=(path)
+    @@cache_dir = path
   end
 
   # External fact directory attribute

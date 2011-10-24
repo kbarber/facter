@@ -11,8 +11,8 @@ module Facter
       names = argv
 
       # Change location of cache file
-      if options[:cachefile]
-        Facter::Util::Config.cache_file = options[:cachefile]
+      if options[:cachedir]
+        Facter::Util::Config.cache_dir = options[:cachedir]
       end
 
       # Change location of external facts dir
@@ -85,7 +85,7 @@ module Facter
         opts.on("-y", "--yaml")   { |v| options[:yaml]   = v }
         opts.on("-j", "--json")   { |v| options[:json]   = v }
         opts.on(      "--trace")  { |v| options[:trace]  = v }
-        opts.on(      "--cachefile FILE") { |v| options[:cachefile] = v }
+        opts.on(      "--cachedir FILE") { |v| options[:cachedir] = v }
         opts.on(      "--ext DIR") { |v| options[:ext] = v }
         opts.on("-d", "--debug")  { |v| Facter.debugging(1) }
         opts.on("-t", "--timing") { |v| Facter.timing(1) }

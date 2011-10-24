@@ -254,8 +254,8 @@ echo three=four
     end 
 
     it "should use any cache provided at initialization time" do
-      Facter::Util::Config.cache_file = tmpfile
-      Facter::Util::Cache.set(script_file, {"one" => "yay"}, 1)
+      Facter.cache.cache_file = tmpfile
+      Facter.cache.set(script_file, {"one" => "yay"}, 1)
 
       parser = Facter::Util::Parser.new(script_file)
       parser.expects(:ttl).once.returns(1)
@@ -264,9 +264,9 @@ echo three=four
 
     it "should return a hash directly from the executable when the cache is not primed" do
       cache_file = tmpfile
-      Facter::Util::Config.cache_file = cache_file
+      Facter.cache.cache_file = cache_file
 
-      Facter::Util::Cache.any_instance.stubs(:write!)
+      Facter.cache.stubs(:save)
 
       Facter::Util::Parser.new(script_file).values.should == {"one" => "two", "three" => "four"}
     end
@@ -340,8 +340,8 @@ EOS
 
     it "should use any cache provided at initialization time" do
       cache_file = tmpfile
-      Facter::Util::Config.cache_file = cache_file
-      Facter::Util::Cache.set(script_file,{"one" => "yay"},1)
+      Facter.cache.cache_file = cache_file
+      Facter.cache.set(script_file,{"one" => "yay"},1)
 
       parser = Facter::Util::Parser.new(script_file)
       parser.expects(:ttl).returns(1)
@@ -350,9 +350,9 @@ EOS
 
     it "should return a hash directly from the executable when the cache is not primed" do
       cache_file = tmpfile
-      Facter::Util::Config.cache_file = cache_file
+      Facter.cache.cache_file = cache_file
 
-      Facter::Util::Cache.any_instance.stubs(:write!)
+      Facter.cache.stubs(:save)
 
       Facter::Util::Parser.new(script_file).values.should == {"var1" => "value1", "var2" => "value2", "var3" => "value3"}
     end

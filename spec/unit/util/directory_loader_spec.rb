@@ -90,7 +90,7 @@ describe Facter::Util::DirectoryLoader do
 
     it "should use the cache when loading data" do
       cache_file = tmpfile
-      Facter::Util::Config.cache_file = cache_file
+      Facter.cache.cache_file = cache_file
 
       @loader = Facter::Util::DirectoryLoader.new(tmpdir)
 
@@ -114,8 +114,8 @@ echo three=four
       ttl_file = File.join(@loader.directory, "myscript.bat.ttl")
       File.open(ttl_file, "w") { |f| f.print "1" }
       
-      Facter::Util::Cache.set(file,{"foo" => "bar"},1)
-      Facter::Util::Cache.write!
+      Facter.cache.set(file,{"foo" => "bar"},1)
+      Facter.cache.save
 
       @loader.load
 

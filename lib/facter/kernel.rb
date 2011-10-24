@@ -9,7 +9,7 @@
 # Caveats:
 #
 
-Facter.add(:kernel) do
+Facter.add(:kernel, :ttl => 3000) do
   setcode do
     require 'facter/util/config'
 

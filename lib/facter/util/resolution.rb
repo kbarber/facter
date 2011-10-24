@@ -16,6 +16,8 @@ class Facter::Util::Resolution
   attr_writer :value, :weight
 
   INTERPRETER = Facter::Util::Config.is_windows? ? "cmd.exe" : "/bin/sh"
+  # TODO: have some command line way of setting this perhaps?
+  DEFAULT_TTL = 0
 
   def self.have_which
     if ! defined?(@have_which) or @have_which.nil?
@@ -144,7 +146,7 @@ class Facter::Util::Resolution
   # 0 seconds.
   def ttl
     return @ttl if @ttl
-    return 0
+    return DEFAULT_TTL
   end
 
   # Set the #Cache time to live for this fact in seconds.
@@ -169,6 +171,7 @@ class Facter::Util::Resolution
 
   # How we get a value for our resolution mechanism.
   def value
+    # XXX: just for testing
     return @value if @value
     result = nil
     return result if @code == nil
@@ -176,10 +179,12 @@ class Facter::Util::Resolution
     starttime = Time.now.to_f
 
     from_cache = false
-    begin
-      result = Facter::Util::Cache.get(name, ttl)
-      from_cache = true
-    rescue Exception => e
+    cache = Facter.cache
+
+    result = cache.get(name.to_s, ttl)
+
+    if result == :noentry then
+      # Do the resolution ...
       begin
         Timeout.timeout(limit) do
           if @code.is_a?(Proc)
@@ -188,7 +193,9 @@ class Facter::Util::Resolution
             result = Facter::Util::Resolution.exec(@code)
           end
         end
-        Facter::Util::Cache.set(name, result, ttl)
+
+        # Lets update the cache with our resolved value
+        cache.set(name.to_s, result, ttl)
       rescue Timeout::Error => detail
         warn "Timed out seeking value for %s" % self.name
   
@@ -201,6 +208,8 @@ class Facter::Util::Resolution
         warn "Could not retrieve %s: %s" % [self.name, details]
         return nil
       end
+    else
+      from_cache = true
     end
 
     finishtime = Time.now.to_f
