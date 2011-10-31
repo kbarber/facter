@@ -18,7 +18,37 @@ describe Facter::Util::Cache do
       cache_obj = Facter::Util::Cache.new(tmpfile)
     end
 
-    describe "when using the path argument" do
+    describe "when cache file is not readable" do
+      let(:cache_file) { tmpfile }
+      let(:cache_obj) { Facter::Util::Cache.new(cache_file) }
+
+      before :each do
+        # Silence warnings
+        Kernel.stubs(:warn)
+
+        # Empty file
+        File.open(cache_file, "w") { |f| f.write("") }
+
+        # Make cache file read-only
+        File.chmod(0000, cache_file)
+      end
+
+      after :each do
+        # Reset permissions so files can be cleaned up
+        File.chmod(0644, cache_file)
+      end
+
+      it "using the memory cache should still work" do
+        cache_obj.to_hash.should == {}
+      end
+
+      it "should return warning" do
+        Facter.expects(:warnonce).with(regexp_matches(/^Cannot read from cache file: /))
+        cache_obj.to_hash == {}
+      end
+    end
+
+    describe "when validating the path argument" do
       describe "should throw an error if it is not a valid String, " do
         invalid_items = [
           ["item1","item2"],
@@ -30,18 +60,17 @@ describe Facter::Util::Cache do
           :symbol,
         ]
         invalid_items.each do |invalid_item|
-          #TODO: work out the exact exception and message
           it "for example: #{invalid_item.inspect}" do
-            expect {
-              Facter::Util::Cache.new(invalid_item)
-            }.should raise_error(TypeError, "Cache only accepts a string " \
+            expect { Facter::Util::Cache.new(invalid_item) }.should(
+              raise_error(TypeError, "Cache only accepts a string " \
               "containing a file path during initialization")
+            )
           end
         end
       end
     end
 
-    # TODO: test for bad permissions and warnings when initializing
+    # TODO: tests for bad load files
   end
 
   describe "when using method" do
@@ -68,14 +97,29 @@ describe Facter::Util::Cache do
         cache_obj.set("key1", "value1", 1)
       end
 
-      describe "when using the key parameter" do
+      it "should cache forever when set to -1" do
+        cache_obj.set("foo", "bar", -1)
+
+        now = Time.now
+        Time.stubs(:now).returns(now + 1_000_000)
+
+        cache_obj.get("foo").should == "bar"
+      end
+
+      # Validation tests
+      describe "when validating the key parameter" do
         describe "should not throw an error when it is valid, " do
           valid_items = [
             "key1",
+            "operatingsystem",
+            "ipaddress_eth0",
+            "is_virtual",
           ]
           valid_items.each do |valid_item|
             it "for example: #{valid_item.inspect}" do
-              cache_obj.set(valid_item, "value")
+              expect { cache_obj.set(valid_item, "value") }.should_not(
+                raise_error(TypeError)
+              )
             end
           end
         end
@@ -95,21 +139,26 @@ describe Facter::Util::Cache do
           ]
           invalid_items.each do |invalid_item|
             it "for example: #{invalid_item.inspect}" do
-              expect {
-                cache_obj.set(invalid_item, "value")
-              }.should raise_error(TypeError, "Key only accepts a String " \
+              expect { cache_obj.set(invalid_item, "value") }.should(
+                raise_error(TypeError, "Key only accepts a String " \
                 "when using the set method. It must be smaller then 256 " \
                 "characters and not be empty.")
+              )
             end
           end
         end
       end
 
-      describe "when using the value parameter" do
+      describe "when validating the value parameter" do
         describe "should not throw an error when it is valid, " do
           valid_items = [
             nil,
+            true,
+            false,
             "key1",
+            3,
+            45.6766,
+            -53,
             {"key1" => "value1"},
             ["item1", "item2"],
             {"key1" => ["item1","item2"]},
@@ -117,10 +166,15 @@ describe Facter::Util::Cache do
             {"key1" => ""},
             ["item1", nil],
             ["item1", ""],
+            [true, false],
+            [true, "", "bar"],
+            {"key1" => true},
           ]
           valid_items.each do |valid_item|
             it "for example: #{valid_item.inspect}" do
-              cache_obj.set("key", valid_item)
+              expect { cache_obj.set("key", valid_item) }.should_not(
+                raise_exception(TypeError)
+              )
             end
           end
         end
@@ -129,8 +183,6 @@ describe Facter::Util::Cache do
           invalid_items = [
             Object.new,
             Class,
-            1,
-            1.1,
             :symbol,
             ["item1", Object.new],
             {"key1" => Object.new},
@@ -140,20 +192,19 @@ describe Facter::Util::Cache do
             {"key1" => {"key2" => ["item1", :symbol] } },
           ]
           invalid_items.each do |invalid_item|
-            #TODO: work out the exact exception and message
             it "for example: #{invalid_item.inspect}" do
-              expect {
-                cache_obj.set("key", invalid_item)
-              }.should raise_error(TypeError, "Value only accepts Strings, " \
+              expect { cache_obj.set("key", invalid_item) }.should(
+                raise_error(TypeError, "Value only accepts Strings, " \
                 "Hashes, Arrays or combinations thereof when using the set " \
-                "method. nil is also acceptable on the right hand side of a " \
-                "Hash or in an Array.")
+                "method. true, false and nil is also acceptable on the right " \
+                "hand side of a Hash or in an Array.")
+              )
             end
           end
         end
       end
 
-      describe "when using the ttl parameter" do
+      describe "when validating the ttl parameter" do
         describe "should not throw an error when it is valid, " do
           valid_items = [
             0,
@@ -164,7 +215,9 @@ describe Facter::Util::Cache do
           ]
           valid_items.each do |valid_item|
             it "for example: #{valid_item.inspect}" do
-              cache_obj.set("key", "value", valid_item)
+              expect { cache_obj.set("key", "value", valid_item) }.should_not(
+                raise_error(TypeError)
+              )
             end
           end
         end
@@ -185,13 +238,14 @@ describe Facter::Util::Cache do
           ]
           invalid_items.each do |invalid_item|
             it "for example: #{invalid_item.inspect}" do
-              expect {
-                cache_obj.set("key", "value", invalid_item)
-              }.should raise_error(TypeError, "TTL must be an integer " \
-                "between -1 and 2**31.")
+              expect { cache_obj.set("key", "value", invalid_item) }.should(
+                raise_error(TypeError, "ttl must be an integer between -1 " \
+                "and 2**31.")
+              )
             end
           end
         end
+
       end
     end
 
@@ -209,12 +263,11 @@ describe Facter::Util::Cache do
         cache_obj.get("key1", 1)
       end
 
-      it "should retrieve the correct value in the set" do
+      it "should retrieve the correct value after using set" do
         cache_obj.get("key1").should == "value1"
       end
 
-      # TODO: why is this working?
-      it "should use stored TTL by default" do
+      it "should use stored ttl by default" do
         cache_obj.set("key1", "value1", 5)
 
         # Wind forward time
@@ -222,11 +275,12 @@ describe Facter::Util::Cache do
         Time.stubs(:now).returns(now + 7)
 
         # Now we should get a noentry
-        expect { cache_obj.get("key1") }.should
+        expect { cache_obj.get("key1") }.should(
           raise_error(Facter::Util::CacheNoEntry, "Expired cache entry")
+        )
       end
 
-      it "should allow us to override the TTL" do
+      it "should allow us to override the ttl" do
         cache_obj.set("key1", "value1", 5)
 
         # Wind forward time
@@ -245,14 +299,41 @@ describe Facter::Util::Cache do
         cache_obj.get("foo").should == "bar"
       end
 
-      describe "when using the key parameter" do
+      it "should throw a CacheNoEntry exception when ttl has expired" do
+        cache_obj.set("foo", "bar", 5)
+        cache_obj.get("foo").should == "bar"
+
+        now = Time.now
+        Time.stubs(:now).returns(now + 30)
+        expect { cache_obj.get("foo",1) }.should(
+          raise_error(Facter::Util::CacheNoEntry, "Expired cache entry")
+        )
+      end
+
+      it "should cache forever when ttl set to -1" do
+        cache_obj.set("foo", "bar", 1)
+
+        now = Time.now
+        Time.stubs(:now).returns(now + 1_000_000)
+
+        cache_obj.get("foo", -1).should == "bar"
+      end
+
+      # Validation tests
+      describe "when validating the key parameter" do
         describe "should not throw an error when it is valid, " do
           valid_items = [
             "key1",
+            "operatingsystem",
+            "virtual",
+            "is_virtual",
+            "ipaddress_eth0",
           ]
           valid_items.each do |valid_item|
             it "for example: #{valid_item.inspect}" do
-              cache_obj.get(valid_item)
+              expect { cache_obj.get(valid_item) }.should_not(
+                raise_error(TypeError)
+              )
             end
           end
         end
@@ -272,19 +353,20 @@ describe Facter::Util::Cache do
           ]
           invalid_items.each do |invalid_item|
             it "for example: #{invalid_item.inspect}" do
-              expect {
-                cache_obj.get(invalid_item)
-              }.should raise_error(TypeError, "Key only accepts a String " \
+              expect { cache_obj.get(invalid_item) }.should(
+                raise_error(TypeError, "Key only accepts a String " \
                 "when using the set method. It must be smaller then 256 " \
                 "characters and not be empty.")
+              )
             end
           end
         end
       end
 
-      describe "when using the ttl parameter" do
+      describe "when validating the override_ttl parameter" do
         describe "should not throw an error when it is valid, " do
           valid_items = [
+            nil,
             0,
             -1,
             15,
@@ -293,7 +375,9 @@ describe Facter::Util::Cache do
           ]
           valid_items.each do |valid_item|
             it "for example: #{valid_item.inspect}" do
-              cache_obj.get("key1", valid_item)
+              expect { cache_obj.get("key1", valid_item) }.should_not(
+                raise_error(TypeError)
+              )
             end
           end
         end
@@ -310,14 +394,13 @@ describe Facter::Util::Cache do
             1.1,
             :symbol,
             "",
-            nil,
           ]
           invalid_items.each do |invalid_item|
             it "for example: #{invalid_item.inspect}" do
-              expect {
-                cache_obj.get("key", invalid_item)
-              }.should raise_error(TypeError, "TTL must be an integer " \
-                "between -1 and 2**31.")
+              expect { cache_obj.get("key", invalid_item) }.should(
+                raise_error(TypeError, "ttl must be an integer between -1 " \
+                "and 2**31.")
+              )
             end
           end
         end
@@ -329,14 +412,30 @@ describe Facter::Util::Cache do
         cache_obj.delete("key1")
       end
 
-      describe "when using the key parameter" do
+      it "should clear the object when used" do
+        cache_obj.set("key1", "value1", -1)
+        cache_obj.get("key1").should == "value1"
+        cache_obj.delete("key1")
+        expect { cache_obj.get("key1") }.should(
+          raise_error(Facter::Util::CacheNoEntry, "No entry in cache.")
+        )
+      end
+
+      # Validation tests
+      describe "when validating the key parameter" do
         describe "should not throw an error when it is valid, " do
           valid_items = [
             "key1",
+            "operatingsystem",
+            "ipaddress_eth0",
+            "is_virtual", 
+            "virtual",
           ]
           valid_items.each do |valid_item|
             it "for example: #{valid_item.inspect}" do
-              cache_obj.delete(valid_item)
+              expect { cache_obj.delete(valid_item) }.should_not(
+                raise_error(TypeError)
+              )
             end
           end
         end
@@ -356,11 +455,11 @@ describe Facter::Util::Cache do
           ]
           invalid_items.each do |invalid_item|
             it "for example: #{invalid_item.inspect}" do
-              expect {
-                cache_obj.delete(invalid_item)
-              }.should raise_error(TypeError, "Key only accepts a String " \
-                "when using the set method. It must be smaller then 256 " \
+              expect { cache_obj.delete(invalid_item) }.should(
+                raise_error(TypeError, "Key only accepts a String when " \
+                "using the set method. It must be smaller then 256 " \
                 "characters and not be empty.")
+              )
             end
           end
         end
@@ -450,8 +549,6 @@ describe Facter::Util::Cache do
           File.exists?(tmp_cache_file).should be_false
         end
       end
-
-      # TODO: more tests
     end
 
     describe "load" do
@@ -459,31 +556,51 @@ describe Facter::Util::Cache do
         cache_obj.load
       end
 
-      describe "when cache file has invalid data" do
-        before :each do
+      it "should allow loading, saving, flushing and loading and still preserve cache" do
+        cache_obj.load
+        cache_obj.to_hash.should == {}
+
+        cache_obj.set("foo", "bar", 5)
+        cache_obj.save
+
+        cache_obj.flush
+
+        cache_obj.load
+        cache_obj.get("foo").should == "bar"
+      end
+
+      describe "when cache file has invalid data should warn and return empty data set" do
+        it "for example - a string" do
           File.open(cache_file, "w") do |f|
-            f.write("foobar data")
+            f.write("---\nfoobar data")
           end
-        end
 
-        it "should return empty data set" do
+          Facter.expects(:warnonce).twice.with("Cache data is not valid. Using empty cache.")
           cache_obj.load
           cache_obj.to_hash.should == {}
         end
 
-        it "should allow overwriting" do
+        it "for example - an array" do
+          File.open(cache_file, "w") do |f|
+            f.write("---\n- foo\n- bar\n")
+          end
+
+          Facter.expects(:warnonce).twice.with("Cache data is not valid. Using empty cache.")
           cache_obj.load
           cache_obj.to_hash.should == {}
+        end
 
-          cache_obj.set("foo", "bar", 5)
-          cache_obj.save
+        it "for example - json data" do
+          File.open(cache_file, "w") do |f|
+            f.write('{"key1":"value1"}')
+          end
 
+          Facter.expects(:warnonce).twice.with(regexp_matches(/^Cache data is not valid. Using empty cache/))
           cache_obj.load
-          cache_obj.get("foo").should == "bar"
+          cache_obj.to_hash.should == {}
         end
       end
 
-      # TODO: Whats the purpose of this test exactly?
       it "should retain the data age when storing on disk" do
         cache_obj.set("foo", "bar", 1)
         cache_obj.save
@@ -492,29 +609,71 @@ describe Facter::Util::Cache do
 
         now = Time.now
         Time.stubs(:now).returns(now + 30)
-        expect { cache_obj.get("foo") }.should
-          raise_error(Facter::Util::CacheNoEntry, "No entry in cache.")
+
+        expect { cache_obj.get("foo") }.should(
+          raise_error(Facter::Util::CacheNoEntry, "Expired cache entry")
+        )
       end
 
       it "should be able to return both old and new data when loading from disk" do
         cache_obj.set("foo", "bar", 5)
         cache_obj.save
+
+        cache_obj.flush
+
         cache_obj.load
-
-        cache_obj.get("foo",5).should == "bar"
-
+        cache_obj.get("foo").should == "bar"
         cache_obj.set("biz", "baz", 5)
         cache_obj.save
+
+        cache_obj.flush
+
         cache_obj.load
 
-        cache_obj.get("biz",5).should == "baz"
-        cache_obj.get("foo",5).should == "bar"
-        cache_obj.get("biz",5).should == "baz"
+        cache_obj.get("biz").should == "baz"
+        cache_obj.get("foo").should == "bar"
+        cache_obj.get("biz").should == "baz"
       end
 
-      # TODO: more tests
-      # TODO: use fixtures to load pre-arranged caches
-      # TODO: test for warnings when the permissions are bad on the cache file
+      describe "when cache file becomes not readable" do
+        let(:cache_file) { tmpfile }
+        let(:cache_obj) { Facter::Util::Cache.new(cache_file) }
+
+        before :each do
+          # Silence warnings
+          Kernel.stubs(:warn)
+
+          # Empty file
+          File.open(cache_file, "w") { |f| f.write("") }
+        end
+
+        after :each do
+          # Reset permissions so files can be cleaned up
+          File.chmod(0644, cache_file)
+        end
+
+        it "setting and getting memory cache should still work" do
+          cache_obj.to_hash.should == {}
+
+          # Make cache file read-only
+          File.chmod(0000, cache_file)
+
+          cache_obj.load
+          cache_obj.to_hash.should == {}
+        end
+
+        it "should return warning" do
+          cache_obj.to_hash.should == {}
+
+          # Make cache file read-only
+          File.chmod(0000, cache_file)
+
+          Facter.expects(:warnonce).with(regexp_matches(/^Cannot read from cache file: /))
+          cache_obj.load
+        end
+      end
+
+      # TODO: use fixtures to load pre-arranged caches valid/invalid
     end
 
     describe "flush" do
@@ -535,7 +694,8 @@ describe Facter::Util::Cache do
       end
     end
 
-    describe "expire" do
+    pending "expire" do
+
       it "should run without error" do
         cache_obj.expire
       end
@@ -567,54 +727,9 @@ describe Facter::Util::Cache do
         cache_data.has_key?("key3").should be_false
         cache_data.has_key?("key4").should be_false
       end
-    end
-  end
 
-  # TODO: these are the old tests - need to move this around probably
-  describe "when storing data" do
-    let(:cache_file) { tmpfile }
-    let(:cache_obj) { Facter::Util::Cache.new(cache_file) }
-
-    # TODO: should use this framework with all the validation 
-    #       tests in get/set
-    it "should store the provided data in the cache" do
-      cache_obj.set("/my/file", {"foo" => "bar"}, 5)
-      cache_obj.get("/my/file",5).should == {"foo" => "bar"}
     end
 
-    it "should save the data to disk immediately" do
-      cache_obj.set("foo", "bar", 5)
-      cache_obj.save
-
-      cache_obj.flush
-
-      cache_obj.load
-      cache_obj.get("foo",5).should == "bar"
-    end
-
-    it "should not cache data whose TTL is set to 0" do
-      # TODO: need to think about how to deal with this
-      cache_obj.set("foo", "bar", 0)
-      expect { cache_obj.get("foo") }.should raise_error(Facter::Util::CacheException)
-    end
-
-    it "should cache forever when TTL is set to -1" do
-      cache_obj.set("foo", "bar", -1)
-
-      now = Time.now
-      Time.stubs(:now).returns(now + 1_000_000)
-
-      cache_obj.get("foo").should == "bar"
-    end
-
-    it "should discard data that has expired according to the TTL" do
-      cache_obj.set("foo", "bar", 5)
-      cache_obj.get("foo",5).should == "bar"
-
-      now = Time.now
-      Time.stubs(:now).returns(now + 30)
-      expect { cache_obj.get("foo",1) }.should raise_exception
-    end
   end
 
 end

@@ -114,8 +114,8 @@ echo three=four
       ttl_file = File.join(@loader.directory, "myscript.bat.ttl")
       File.open(ttl_file, "w") { |f| f.print "1" }
       
-      Facter::Util::Cache.set(file,{"foo" => "bar"},1)
-      Facter::Util::Cache.write!
+      Facter.cache.set(file,{"foo" => "bar"},1)
+      Facter.cache.save
 
       @loader.load
 

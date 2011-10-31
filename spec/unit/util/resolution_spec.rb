@@ -143,6 +143,10 @@ describe Facter::Util::Resolution do
         Facter::Util::Config.cache_file = tmpfile
       end
 
+      after :each do
+        Facter.cache.flush
+      end
+
       it "return a cached value when ttl has not been reached" do
         @resolve.ttl = 1_000_000
         @resolve.setcode { "foo" }
@@ -172,12 +176,12 @@ describe Facter::Util::Resolution do
       end
 
       it "return an uncached value when ttl has expired" do
-        @resolve.ttl = 1 
+        @resolve.ttl = 2
         @resolve.setcode { "foo" }
         @resolve.value.should == "foo"
 
         now = Time.now
-        Time.stubs(:now).returns(now + 2)
+        Time.stubs(:now).returns(now + 60)
 
         @resolve.setcode { "bar" }
         @resolve.value.should == "bar"

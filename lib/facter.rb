@@ -57,6 +57,14 @@ module Facter
     @collection
   end
 
+  # TODO: tests for this
+  def self.cache
+    unless defined?(@cache) and @cache
+      @cache = Facter::Util::Cache.new(Facter::Util::Config.cache_file)
+    end
+    @cache
+  end
+
   # Return the version of the library.
   def self.version
     return FACTERVERSION
@@ -71,6 +79,8 @@ module Facter
       puts GREEN + string + RESET
     end
   end
+
+  # TODO: debugonce for throttling
 
   def self.debugging?
     @@debug != 0

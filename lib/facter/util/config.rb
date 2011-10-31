@@ -39,11 +39,11 @@ module Facter::Util::Config
   # Retrieve the cache file path
   def self.cache_file
     if is_windows?
-      @@cache_file ||= File.join(windows_data_dir, "cache/facter_cache.dat")
+      @@cache_file ||= File.join(windows_data_dir, "cache/facter_cache.yaml")
     elsif is_mac?
-      @@cache_file ||= "/var/db/facter_cache.dat"
+      @@cache_file ||= "/var/db/facter_cache.yaml"
     else
-      @@cache_file ||= "/var/cache/facter_cache.dat"
+      @@cache_file ||= "/var/cache/facter_cache.yaml"
     end
     @@cache_file
   end

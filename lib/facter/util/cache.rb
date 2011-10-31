@@ -26,10 +26,6 @@ class Facter::Util::Cache
     # Set the cache file.
     @cache_file = path
 
-    # Cache file is retrieved from global facter config area.
-    # TODO: move this commented item to the calling area
-    #@cache_file = Facter::Util::Config.cache_file
-
     # Load cache on initialization - must be done after we have a mutex
     # and a cache file.
     load
@@ -48,6 +44,7 @@ class Facter::Util::Cache
   # * ttl - this is the TTL to store with the entry that will be used for expiry
   #         calculations later on. It must be an integer no greater then 2^31.
   #         A zero indicates to never cache, and a -1 indicates cache forever.
+  # TODO: what should be the default here anyway?
   def set(key, value, ttl = -1)
     # The key should only be a string.
     unless validate_key(key) then
@@ -58,13 +55,13 @@ class Facter::Util::Cache
     # The value should only be a string, Hash or Array or combination thereof
     unless validate_value(value) then
       raise TypeError.new("Value only accepts Strings, Hashes, Arrays or " \
-        "combinations thereof when using the set method. nil is also " \
-        "acceptable on the right hand side of a Hash or in an Array.")
+        "combinations thereof when using the set method. true, false and nil " \
+        "is also acceptable on the right hand side of a Hash or in an Array.")
     end
 
     # The TTL should be an integer between -1 and 2**31
     unless validate_ttl(ttl) then
-      raise TypeError.new("TTL must be an integer between -1 and 2**31.")
+      raise TypeError.new("ttl must be an integer between -1 and 2**31.")
     end
 
     # Synchronize our changes to the @data hash
@@ -76,14 +73,14 @@ class Facter::Util::Cache
   # Returns the cached items for a particular file.
   #
   # * key - the key to retrieve from the cache
-  # * ttl - allows us to override the TTL specified when it was stored
+  # * override_ttl - allows us to override the TTL specified when it was stored
   # TODO: use an options hash instead of just ttl so we can extend this.
-  # TODO: ttl should be 'override_ttl' 
-  # TODO: should fall back to stored TTL by default. Should not be -1
   # TODO: maybe we should return CacheItem objects instead of Exceptions. This
   #       way we indicate a failure with nil, but we can still get the value
   #       of nil with a 'value' method.
-  def get(key, ttl = -1)
+  # TODO: should we delete expired entries? This will break 'cache-only' options
+  #       later on.
+  def get(key, override_ttl = nil)
     # The key should only be a string.
     unless validate_key(key) then
       raise TypeError.new("Key only accepts a String when using the set " \
@@ -91,17 +88,17 @@ class Facter::Util::Cache
     end
 
     # The TTL should be an integer between -1 and 2**31
-    unless validate_ttl(ttl) then
-      raise TypeError.new("TTL must be an integer between -1 and 2**31.")
+    unless validate_ttl(override_ttl) or override_ttl == nil then
+      raise TypeError.new("ttl must be an integer between -1 and 2**31.")
     end
 
     # If ttl zero raise a no entry exception
-    if ttl == 0 then
-      raise Facter::Util::CacheNoEntry.new("TTL specified is zero so no " \
+    if override_ttl == 0 then
+      raise Facter::Util::CacheNoEntry.new("ttl specified is zero so no " \
         "cache entry will ever be returned.")
     end
 
-    # Check there is even an entry
+    # Check if there is even an entry
     unless @data.has_key?(key) then
       raise Facter::Util::CacheNoEntry.new("No entry in cache.")
     end
@@ -111,18 +108,24 @@ class Facter::Util::Cache
       # TODO: no data element means bad cache - probably need to deal with this
     end
 
+    # Override the stored TTL if there is one specified in the get
+    use_ttl = override_ttl
+    use_ttl ||= @data[key][:ttl]
+
     # If TTL -1 - always return cache
-    if ttl == -1 then
+    if use_ttl == -1 then
       return @data[key][:data]
     end
+ 
+    # TODO: should we be worried about stored time that is later then now?
+    now = Time.now.to_i # epoch time from UTC - timezone shouldn't matter
+    if (now - @data[key][:stored]) <= use_ttl then
+      return @data[key][:data]
+    else
+      raise Facter::Util::CacheNoEntry.new("Expired cache entry")
+    end
 
-    # TODO: be careful timezone issues
-    now = Time.now.to_i
-    return @data[key][:data] if (now - @data[key][:stored]) <= ttl
 
-    # Finally just return entry expiration message
-    raise Facter::Util::CacheNoEntry.new("Expired cache entry")
-    # TODO: expire that entry
   rescue Facter::Util::CacheException => e
     Facter.debug("no cache for #{key}: " + e.message)
     raise(e)
@@ -148,16 +151,24 @@ class Facter::Util::Cache
     # Load file or return an empty hash if there is a non-fatal problem
     loaded_data = {}
     begin
+      # TODO: not sure how to deal with Windows locking here.
       loaded_data = YAML.load_file(@cache_file)
+
+      # TODO: add better checks around the loaded file to make sure its valid
+      if loaded_data.class != Hash then
+        Facter.warnonce("Cache data is not valid. Using empty cache.")
+        loaded_data = {}
+      end
     rescue Errno::EACCES => e
       # Return a warning if the cache file is not readable
       Facter.warnonce("Cannot read from cache file: " + e.message)
+    rescue ArgumentError => e
+      # Return a warning when the file is partially parseable but fails.
+      Facter.warnonce("Cache data is not valid. Using empty cache: " + e.message)
     rescue Errno::ENOENT
       # Do nothing if the file does not exist. This is non-fatal and the default
       # empty hash should be returned.
     end
-
-    # TODO: add checks around the loaded file to make sure its valid
 
     # Lock on mutex for storing the data to provide thread safety
     @cache_write_mutex.synchronize {
@@ -167,16 +178,11 @@ class Facter::Util::Cache
 
   # Writes cache to its backend storage.
   def save
-    # TODO: add checks around this various file errors
-    # TODO: handle file move problems
-    # TODO: gracefully clean up tmp file if anything fails
-
     # Create a sufficently random temporary file
     tmp_cache_file = random_file(@cache_file)
 
     # Try to write to the temp file
     begin
-      # TODO:
       File.open(tmp_cache_file, "w", 0600) {|f| YAML.dump(@data, f) }
     rescue Errno::EACCES => e
       # Return a warning if the cache is not writeable but do not fail as this
@@ -243,7 +249,7 @@ class Facter::Util::Cache
   # combination thereof.
   def validate_value(value)
     case value.class.to_s
-    when "String","NilClass" then
+    when "String","NilClass","TrueClass","FalseClass","Fixnum","Float" then
       return validate_value_rhs(value)
     when "Array" then
       return_value = true
@@ -291,9 +297,7 @@ class Facter::Util::Cache
   # a hash or a single string element in an array or scalar.
   def validate_value_rhs(value)
     case value.class.to_s
-    when "String"
-      return true
-    when "NilClass"
+    when "String","NilClass","TrueClass","FalseClass","Fixnum","Float"
       return true
     else
       return false

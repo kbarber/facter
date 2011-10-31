@@ -176,10 +176,12 @@ class Facter::Util::Resolution
     starttime = Time.now.to_f
 
     from_cache = false
+    cache = Facter.cache
+
     begin
-      result = Facter::Util::Cache.get(name, ttl)
+      result = cache.get(name.to_s, ttl)
       from_cache = true
-    rescue Exception => e
+    rescue Facter::Util::CacheException
       begin
         Timeout.timeout(limit) do
           if @code.is_a?(Proc)
@@ -188,7 +190,13 @@ class Facter::Util::Resolution
             result = Facter::Util::Resolution.exec(@code)
           end
         end
-        Facter::Util::Cache.set(name, result, ttl)
+
+        # Catch cache set errors
+        begin
+          cache.set(name.to_s, result, ttl)
+        rescue TypeError => e
+          Facter.warnonce("Unable to store cache for key: #{name.inspect} value: #{result.inspect} ttl: #{ttl.inspect}. Error is: " + e.message)
+        end
       rescue Timeout::Error => detail
         warn "Timed out seeking value for %s" % self.name
   
