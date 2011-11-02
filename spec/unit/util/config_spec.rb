@@ -37,6 +37,8 @@ describe Facter::Util::Config do
 
   describe "cache_file attribute" do
     around :each do |example|
+      # Wipe out the cache file around each run to ensure
+      # we have no side-effects
       Facter::Util::Config.cache_file = nil
       example.run
       Facter::Util::Config.cache_file = nil

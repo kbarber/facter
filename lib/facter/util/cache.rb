@@ -7,12 +7,19 @@ class Facter::Util::CacheException < Exception; end
 
 # This exception allows us to signal no entry when querying the cache
 # since nil is an acceptable return code.
+# TODO: is this absolutely true?
 class Facter::Util::CacheNoEntry < Facter::Util::CacheException; end
 
 # This class provides a fact cache mechanism.
+# TODO: better docs
 class Facter::Util::Cache
 
-  # Create an initialize the cache object
+  # The path to the cache file
+  attr_accessor :cache_file
+  # The mutex for cache writing
+  attr_reader :cache_write_mutex
+
+  # Create and initialize the cache object
   def initialize(path)
     # Check the path is a string first
     unless path.class == String then

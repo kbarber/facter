@@ -140,7 +140,7 @@ describe Facter::Util::Resolution do
 
     describe "and ttl has been set" do
       before :each do
-        Facter::Util::Config.cache_file = tmpfile
+        Facter.cache.cache_file = tmpfile
       end
 
       after :each do

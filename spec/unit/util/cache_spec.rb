@@ -294,6 +294,8 @@ describe Facter::Util::Cache do
       it "should be able to return data previously saved to disk" do
         cache_obj.set("foo", "bar", 5)
         cache_obj.save
+
+        cache_obj.flush
    
         cache_obj.load
         cache_obj.get("foo").should == "bar"
@@ -495,16 +497,11 @@ describe Facter::Util::Cache do
           File.chmod(0644, tmp_cache_file)
         end
 
-        it "setting and getting memory cache should still work" do
-          cache_obj.set("foo", "bar", 5)
-          cache_obj.save
-          cache_obj.get("foo").should == "bar"
-        end
-
-        it "should return warning" do
+        it "should return warning but memory cache should still work" do
           Facter.expects(:warnonce).with(regexp_matches(/^Cannot write to temporary cache file: /))
           cache_obj.set("foo", "bar", 5)
           cache_obj.save
+          cache_obj.get("foo").should == "bar"
         end
       end
 

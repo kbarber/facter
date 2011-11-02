@@ -90,7 +90,7 @@ describe Facter::Util::DirectoryLoader do
 
     it "should use the cache when loading data" do
       cache_file = tmpfile
-      Facter::Util::Config.cache_file = cache_file
+      Facter.cache.cache_file = cache_file
 
       @loader = Facter::Util::DirectoryLoader.new(tmpdir)
 
