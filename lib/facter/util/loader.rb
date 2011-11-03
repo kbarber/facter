@@ -18,6 +18,9 @@ class Facter::Util::Loader
     shortname = fact.to_s.downcase
     load_env(shortname)
 
+    # TODO: find suitable place for this
+    #Facter.cache.load
+
     filename = shortname + ".rb"
     search_path.each do |dir|
       # Load individual files
@@ -29,6 +32,9 @@ class Facter::Util::Loader
       factdir = File.join(dir, shortname)
       load_dir(factdir) if FileTest.directory?(factdir)
     end
+
+    # TODO: find suitable place for this
+    #Facter.cache.save
   end
 
   # Load all facts from all directories.
@@ -36,6 +42,9 @@ class Facter::Util::Loader
     return if defined?(@loaded_all)
 
     load_env
+
+    # TODO: find suitable place for this
+    #Facter.cache.load
 
     directory_loader.load
 
@@ -51,6 +60,9 @@ class Facter::Util::Loader
         end
       end
     end
+
+    # TODO: find suitable place for this
+    #Facter.cache.save
 
     @loaded_all = true
   end

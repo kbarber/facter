@@ -107,7 +107,11 @@ class Facter::Util::Collection
 
   # Return a hash of all of our facts.
   def to_hash
-    @facts.inject({}) do |h, ary|
+    Facter.debug("call to_hash")
+    # TODO: find suitable place for this
+    #Facter.cache.load
+
+    result = @facts.inject({}) do |h, ary|
       value = ary[1].value
       if ! value.nil?
         # For backwards compatibility, convert the fact name to a string.
@@ -115,6 +119,11 @@ class Facter::Util::Collection
       end
       h
     end
+
+    # TODO: find suitable place for this
+    Facter.cache.save
+
+    result
   end
 
   def value(name)

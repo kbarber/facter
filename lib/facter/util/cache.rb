@@ -1,6 +1,7 @@
 require 'yaml'
 require 'thread'
 require 'facter/util/config'
+require 'fileutils'
 
 # These exceptions are used only by the caching mechanism
 class Facter::Util::CacheException < Exception; end
@@ -75,6 +76,9 @@ class Facter::Util::Cache
     @cache_write_mutex.synchronize {
       @data[key] = {:data => value, :stored => Time.now.to_i, :ttl => ttl}
     }
+
+    # TODO: remove - this is just debugging
+    #Facter.debug("XXX: Cache set on #{key} #{value} #{ttl} ... cache data is now #{Facter.cache.to_hash.inspect}")
   end
 
   # Returns the cached items for a particular file.
@@ -181,6 +185,8 @@ class Facter::Util::Cache
     @cache_write_mutex.synchronize {
       @data = loaded_data
     }
+
+    Facter.debug("XXX: loading data: #{@data.inspect}")
   end
 
   # Writes cache to its backend storage.
@@ -188,9 +194,14 @@ class Facter::Util::Cache
     # Create a sufficently random temporary file
     tmp_cache_file = random_file(@cache_file)
 
+    # Get the data to write
+    cache_data = @data
+
+    Facter.debug("XXX: saving data: #{cache_data.inspect}")
+
     # Try to write to the temp file
     begin
-      File.open(tmp_cache_file, "w", 0600) {|f| YAML.dump(@data, f) }
+      File.open(tmp_cache_file, "w", 0600) {|f| YAML.dump(cache_data, f) }
     rescue Errno::EACCES => e
       # Return a warning if the cache is not writeable but do not fail as this
       # should be a non-fatal error.
