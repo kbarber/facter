@@ -6,7 +6,8 @@
 #
 # = Usage
 #
-#   facter [-d|--debug] [-h|--help] [-p|--puppet] [-v|--version] [-y|--yaml] [-j|--json] [fact] [fact] [...]
+#   facter [-d|--debug] [-h|--help] [-p|--puppet] [-v|--version] [-y|--yaml]
+#     [-j|--json] [--cachedir PATH] [--nocache] [--ignorettl] [fact ...]
 #
 # = Description
 #
@@ -41,6 +42,15 @@
 #
 # timing::
 #   Enable timing.
+#
+# cachedir::
+#   The path to the cache directory.
+#
+# nocache::
+#   Disable use of cache for fact resolution.
+#
+# ignorettl::
+#   Always retrieve values from cache regardless of the TTL.
 #
 # = Example
 #

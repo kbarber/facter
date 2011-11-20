@@ -3,7 +3,6 @@
 require 'spec_helper'
 
 describe Facter do
-
   it "should have a version" do
     Facter.version.should =~ /^[0-9]+(\.[0-9]+)*$/
   end
@@ -268,6 +267,49 @@ describe Facter do
     it "should return all registered directories when asked" do
       Facter.search "/my/dir", "/other/dir"
       Facter.search_path.should == %w{/my/dir /other/dir}
+    end
+  end
+
+  describe "cachedir attribute" do
+    around :each do |example|
+      # Wipe out the cache file around each run to ensure
+      # we have no side-effects
+      Facter.cachedir = nil
+      example.run
+      Facter.cachedir = nil
+    end
+
+    it "should allow setting and getting" do
+      dirname = tmpdir
+      Facter.cachedir = dirname
+      Facter.cachedir.should == dirname
+    end
+
+    it "should return the default value for mac" do
+      Facter::Util::Config.stubs(:is_windows?).returns(false)
+      Facter::Util::Config.stubs(:is_mac?).returns(true)
+      Facter.cachedir.should == "/var/db/facter/cache/"
+    end
+
+    it "should return the default value for linux" do
+      Facter::Util::Config.stubs(:is_windows?).returns(false)
+      Facter::Util::Config.stubs(:is_mac?).returns(false)
+      Facter.cachedir.should == "/var/cache/facter/"
+    end
+
+    it "should return the default value for windows 2008" do
+      Facter::Util::Config.stubs(:is_windows?).returns(true)
+      ENV.stubs(:[]).with("ProgramData").returns("C:\\ProgramData")
+      Facter.cachedir.should == "C:\\ProgramData/Puppetlabs/facter/cache/"
+    end
+
+    it "should return the default value for windows 2003R2" do
+      Facter::Util::Config.stubs(:is_windows?).returns(true)
+      ENV.stubs(:[]).with("ProgramData").returns(nil)
+      ENV.stubs(:[]).with("ALLUSERSPROFILE").returns(
+        "C:\\Documents and Settings\\All Users")
+      Facter.cachedir.should == "C:\\Documents and Settings\\All Users/" \
+        "Application Data/Puppetlabs/facter/cache/"
     end
   end
 end

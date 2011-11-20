@@ -9,6 +9,25 @@ module Facter
       # Accept fact names to return from the command line
       names = argv
 
+      # Change location of cache file
+      if options[:cachedir]
+        Facter.cachedir = options[:cachedir]
+      end
+
+      # Disable cache
+      if options[:nocache]
+        Facter.cache_enabled(0)
+      else
+        Facter.cache_enabled(1)
+      end
+
+      # Always retrieve values from cache
+      if options[:ignorettl]
+        Facter.ignorettl(1)
+      else
+        Facter.ignorettl(0)
+      end
+
       # Create the facts hash that is printed to standard out.
       unless names.empty?
         facts = {}
@@ -71,12 +90,15 @@ module Facter
     def self.parse(argv)
       options = {}
       OptionParser.new do |opts|
-        opts.on("-y", "--yaml")   { |v| options[:yaml]   = v }
-        opts.on("-j", "--json")   { |v| options[:json]   = v }
-        opts.on(      "--trace")  { |v| options[:trace]  = v }
-        opts.on("-d", "--debug")  { |v| Facter.debugging(1) }
-        opts.on("-t", "--timing") { |v| Facter.timing(1) }
-        opts.on("-p", "--puppet") { |v| load_puppet }
+        opts.on("-y", "--yaml")          { |v| options[:yaml]   = v }
+        opts.on("-j", "--json")          { |v| options[:json]   = v }
+        opts.on(      "--trace")         { |v| options[:trace]  = v }
+        opts.on(      "--cachedir FILE") { |v| options[:cachedir] = v }
+        opts.on(      "--nocache")       { |v| options[:nocache] = v }
+        opts.on(      "--ignorettl")     { |v| options[:ignorettl] = v }
+        opts.on("-d", "--debug")         { |v| Facter.debugging(1) }
+        opts.on("-t", "--timing")        { |v| Facter.timing(1) }
+        opts.on("-p", "--puppet")        { |v| load_puppet }
 
         opts.on_tail("-v", "--version") do
           puts Facter.version

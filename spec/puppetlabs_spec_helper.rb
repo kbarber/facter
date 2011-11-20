@@ -17,6 +17,7 @@ RSpec.configure do |config|
   config.extend PuppetlabsSpec::Files
   config.extend PuppetlabsSpec::Fixtures
   config.include PuppetlabsSpec::Fixtures
+  config.include PuppetlabsSpec::Files
 
   # This will cleanup any files that were created with tmpdir or tmpfile
   config.after :each do

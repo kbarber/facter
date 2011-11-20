@@ -5,14 +5,16 @@
 # suitable.
 require 'facter/util/confine'
 require 'facter/util/config'
+require 'facter/util/cache'
 
 require 'timeout'
 
 class Facter::Util::Resolution
-  attr_accessor :interpreter, :code, :name, :timeout
+  attr_accessor :interpreter, :code, :name, :timeout, :ttl
   attr_writer :value, :weight
 
   INTERPRETER = Facter::Util::Config.is_windows? ? "cmd.exe" : "/bin/sh"
+  DEFAULT_TTL = 0
 
   def self.have_which
     if ! defined?(@have_which) or @have_which.nil?
@@ -24,6 +26,21 @@ class Facter::Util::Resolution
       end
     end
     @have_which
+  end
+
+  # Return #Cache time to live for this fact in seconds. The default value is
+  # 0 seconds.
+  def ttl
+    return @ttl if @ttl
+    return DEFAULT_TTL
+  end
+
+  def ttl=(newttl)
+    if newttl and newttl.class == Fixnum and (newttl >= 0 or newttl == -1) then
+      @ttl = newttl
+    else
+      raise ArgumentError, "ttl must be either -1, 0 or a positive integer"
+    end
   end
 
   # Execute a program and return the output of that program.
@@ -158,30 +175,44 @@ class Facter::Util::Resolution
 
     starttime = Time.now.to_f
 
-    begin
-      Timeout.timeout(limit) do
-        if @code.is_a?(Proc)
-          result = @code.call()
-        else
-          result = Facter::Util::Resolution.exec(@code)
-        end
-      end
-    rescue Timeout::Error => detail
-      warn "Timed out seeking value for %s" % self.name
+    got_from_cache = false
+    cache = Facter.cache
 
-      # This call avoids zombies -- basically, create a thread that will
-      # dezombify all of the child processes that we're ignoring because
-      # of the timeout.
-      Thread.new { Process.waitall }
-      return nil
-    rescue => details
-      warn "Could not retrieve %s: %s" % [self.name, details]
-      return nil
+    result = cache.get(name.to_s, ttl)
+
+    if result == :noentry then
+      # Do the resolution ...
+      begin
+        Timeout.timeout(limit) do
+          if @code.is_a?(Proc)
+            result = @code.call()
+          else
+            result = Facter::Util::Resolution.exec(@code)
+          end
+          # Lets update the cache with our resolved value
+          cache.set(name.to_s, result, ttl)
+        end
+      rescue Timeout::Error => detail
+        warn "Timed out seeking value for %s" % self.name
+
+        # This call avoids zombies -- basically, create a thread that will
+        # dezombify all of the child processes that we're ignoring because
+        # of the timeout.
+        Thread.new { Process.waitall }
+        return nil
+      rescue => details
+        warn "Could not retrieve %s: %s" % [self.name, details]
+        return nil
+      end
+    else
+      got_from_cache = true
     end
 
     finishtime = Time.now.to_f
     ms = (finishtime - starttime) * 1000
-    Facter.show_time "#{self.name}: #{"%.2f" % ms}ms"
+    time_msg = "#{self.name}: #{"%.2f" % ms}ms"
+    time_msg += " (cached)" if got_from_cache
+    Facter.show_time time_msg
 
     return nil if result == ""
     return result

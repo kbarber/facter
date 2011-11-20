@@ -47,6 +47,8 @@ module Facter
   @@debug = 0
   @@timing = 0
   @@messages = {}
+  @@cache_enabled = 0
+  @@ignorettl = 0
 
   # module methods
 
@@ -55,6 +57,13 @@ module Facter
       @collection = Facter::Util::Collection.new
     end
     @collection
+  end
+
+  def self.cache
+    unless defined?(@cache) and @cache
+      @cache = Facter::Util::Cache.new
+    end
+    @cache
   end
 
   # Return the version of the library.
@@ -83,6 +92,14 @@ module Facter
 
   def self.timing?
     @@timing != 0
+  end
+
+  def self.cache_enabled?
+    @@cache_enabled != 0
+  end
+
+  def self.ignorettl?
+    @@ignorettl != 0
   end
 
   # Return a fact object by name.  If you use this, you still have to call
@@ -208,6 +225,32 @@ module Facter
     end
   end
 
+  # Set cache on or off.
+  def self.cache_enabled(bit)
+    @@cache_enabled = bitcheck(bit)
+  end
+
+  def self.ignorettl(bit)
+    @@ignorettl = bitcheck(bit)
+  end
+
+  def self.bitcheck(bit)
+    if bit
+      case bit
+      when TrueClass; return 1
+      when FalseClass; return 0
+      when Fixnum
+        if bit > 0
+          return 1
+        else
+          return 0
+        end
+      end
+    else
+      return 0
+    end
+  end
+
   def self.warn(msg)
     if Facter.debugging? and msg and not msg.empty?
       msg = [msg] unless msg.respond_to? :each
@@ -244,4 +287,39 @@ module Facter
   def self.search_path
     @search_path.dup
   end
+
+  # The basedir to use for windows data
+  def self.windows_data_dir
+    # If neither environment variable is set - fail.
+    if not ENV["ProgramData"] and not ENV["ALLUSERSPROFILE"] then
+      raise "Neither environment variables ProgramData or ALLUSERSPROFILE " +
+        "are defined. Facter is unable to determine a default dirctory for " +
+        "its uses."
+    end
+    base_dir = ENV["ProgramData"] ||
+      File.join(ENV["ALLUSERSPROFILE"], "Application Data")
+    File.join(base_dir, "Puppetlabs", "facter")
+  end
+
+  # Retrieve the cache file path
+  def self.cachedir
+    if Facter::Util::Config.is_windows?
+      @@cachedir ||= File.join(windows_data_dir, "cache/")
+    elsif Facter::Util::Config.is_mac?
+      @@cachedir ||= "/var/db/facter/cache/"
+    else
+      @@cachedir ||= "/var/cache/facter/"
+    end
+    @@cachedir
+  end
+
+  # Set the current cache file path
+  def self.cachedir=(path)
+    @@cachedir = path
+
+    # Clear the cache variable since resetting the cachedir will require
+    # require re-initialization
+    @cache = nil
+  end
+
 end
