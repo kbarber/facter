@@ -5,7 +5,7 @@ require 'spec_helper'
 describe "ec2 facts" do
   let(:api_prefix) { "http://169.254.169.254" }
 
-  describe "when running on ec2" do
+  describe "when running linux on ec2" do
     before :each do
       # Return fake kernel
       Facter.stubs(:value).with(:kernel).returns("Linux")
@@ -81,6 +81,40 @@ describe "ec2 facts" do
 
       Facter.collection.loader.load(:ec2)
       Facter.fact(:ec2_foo_bar).value.should == "baz"
+    end
+
+    it "should create ec2_user_data fact" do
+      # No meta-data
+      Object.any_instance.expects(:open).\
+        with("#{api_prefix}/2008-02-01/meta-data/").\
+        at_least_once.returns(StringIO.new(""))
+
+      Object.any_instance.expects(:open).\
+        with("#{api_prefix}/2008-02-01/user-data/").\
+        at_least_once.returns(StringIO.new("test"))
+
+      Facter.collection.loader.load(:ec2)
+      Facter.fact(:ec2_userdata).value.should == ["test"]
+    end
+  end
+
+  describe "when running windows on ec2" do
+    before :each do
+      # Return fake kernel
+      Facter.stubs(:value).with(:kernel).returns("windows")
+
+      # Return something upon connecting to the root so the EC2 code continues
+      # with its evaluation.
+      Object.any_instance.expects(:open).with("#{api_prefix}:80/").\
+        at_least_once.returns("2008-02-01\nlatest")
+
+      # Return a non-eucalyptus mac address
+      Facter.expects(:value).with(:macaddress).\
+        at_least_once.returns("12:31:39:04:5A:34")
+
+      # Fake EC2 arp response
+      Facter::Util::Resolution.expects(:exec).with("arp -a").\
+        at_least_once.returns(my_fixture_read("windows-2008-arp-n.out"))
     end
 
     it "should create ec2_user_data fact" do
