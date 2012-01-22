@@ -6,14 +6,14 @@ describe 'Filesystem facts' do
   describe 'on non-Linux OS' do
     it 'should not exist' do
       Facter.fact(:kernel).stubs(:value).returns('SunOS')
-      Facter.fact(:filesystems).should == nil
+      Facter.fact(:filesystems).value.should == nil
     end
   end
 
   describe 'on Linux' do
     before :each do
       Facter.fact(:kernel).stubs(:value).returns('Linux')
-      fixture_data = File.read(fixtures('filesystems', 'linux'))
+      fixture_data = my_fixture_read('linux')
       Facter::Util::Resolution.expects(:exec).at_least_once \
         .with('cat /proc/filesystems 2> /dev/null').returns(fixture_data)
       Facter.collection.loader.load(:filesystems)
@@ -24,7 +24,7 @@ describe 'Filesystem facts' do
     end
 
     it 'should exist' do
-      Facter.fact(:filesystems).should_not == nil
+      Facter.fact(:filesystems).value.should_not == nil
     end
 
     it 'should detect the correct number of filesystems' do
