@@ -1,38 +1,34 @@
-#!usr/bin/env ruby
-#Test for zones and zone_[name] facts
-#
-#Author: Shubhra Sinha Varma
-#
+#!usr/bin/env rspec
+
 require 'spec_helper'
-require 'facter'
 
- describe "on Solaris" do
-   before do
-     Facter.fact(:kernel).stubs(:value).returns("SunOS")
-     Facter.fact(:kernelrelease).stubs(:value).returns("5.10")
-
+describe "on Solaris" do
+  before do
+    Facter.fact(:kernel).stubs(:value).returns("SunOS")
+    Facter.fact(:kernelrelease).stubs(:value).returns("5.10")
   end
 
   describe "number of zones" do
     it "should output number of zones" do
-     sample_output_file = File.open(fixtures('zones', 'zones'))
-     zone_list = sample_output_file.readlines
-     Facter::Util::Resolution.stubs(:exec).with('/usr/sbin/zoneadm list -cp 2>/dev/null').returns(zone_list)
-     Facter.fact(:zones).value.should == zone_list.size
+      zone_list = my_fixture_read("zoneadm-list.out")
+      Facter::Util::Resolution.stubs(:exec).
+        with('/usr/sbin/zoneadm list -cp 2>/dev/null').
+        returns(zone_list)
+      Facter.fact(:zones).value.should == 3
     end
   end
 
   describe "per zone fact and its status" do
-   it "should have a per zone fact with its status" do
-     sample_output_file = File.open(fixtures('zones', 'zones'))
-     zone_list = sample_output_file.readlines
-     zone_list.each do |this_line|
-        this_zone = this_line.split(":")[1]
-        this_zone_stat = this_line.split(":")[2]
-        Facter::Util::Resolution.stubs(:exec).with('/usr/sbin/zoneadm list -cp 2>/dev/null').returns(zone_list)
-        Facter.collection.loader.load(:zones)
-        Facter.value("zone_#{this_zone}".to_sym).should == this_zone_stat
-      end
+    it "should have a per zone fact with its status" do
+      zone_list = my_fixture_read("zoneadm-list.out")
+      Facter::Util::Resolution.stubs(:exec).
+        with('/usr/sbin/zoneadm list -cp 2>/dev/null').
+        returns(zone_list)
+
+      Facter.collection.loader.load(:zones)
+      Facter.value("zone_global").should == "running"
+      Facter.value("zone_local").should  == "configured"
+      Facter.value("zone_zoneA").should  == "stopped"
     end
   end
 end
