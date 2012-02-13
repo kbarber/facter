@@ -1,0 +1,26 @@
+CPU info:
+ 13 Intel(R) Itanium 2 9000 series processors (1.6 GHz, 18 MB)
+          533 MT/s bus, CPU version C2
+          24 logical processors
+
+Memory: 49101 MB (47.95 GB)
+
+Firmware info:
+   Firmware revision:  7.48
+   FP SWA driver revision: 1.18
+   IPMI is supported on this system.
+   BMC firmware revision: 24.04
+
+Platform info:
+   Model:                  "ia64 hp superdome server SD32B"
+   Machine ID number:      11111111-1111-1111-3333-111111111111
+   Machine serial number:  SGH11111XX
+
+OS info:
+   Nodename:  testxxk
+   Release:   HP-UX B.11.31
+   Version:   U (unlimited-user license)
+   Machine:   ia64
+   ID Number: 3043910572
+   vmunix _release_version:               
+@(#) $Revision: vmunix:    B.11.31_LR FLAVOR=perf 
