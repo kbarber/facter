@@ -7,6 +7,9 @@ module Facter::Util::Processor
     if File.exists?(cpuinfo)
       model = Facter.value(:architecture)
       case model
+      # TODO: for some reason Hongbo removed ia64 and hppa from here. This will
+      #       break Linux, so I'll want to see what his /proc/cpuinfo really
+      #       looks like.
       when "x86_64", "amd64", "i386", /parisc/
         Thread::exclusive do
           File.readlines(cpuinfo).each do |l|
@@ -67,7 +70,8 @@ module Facter::Util::Processor
   def self.enum_lsdev
     processor_num = -1
     processor_list = {}
-    if model =~/IBM/
+# TODO: work out why Hongbo did this
+#    if model =~/IBM/
     Thread::exclusive do
       procs = Facter::Util::Resolution.exec('lsdev -Cc processor')
       if procs
@@ -80,7 +84,7 @@ module Facter::Util::Processor
             if proctype =~ /^type\s+(\S+)\s+/
               processor_list[processor_num] = $1
             end
-	   end
+#    end
           end
         end
       end
@@ -88,27 +92,29 @@ module Facter::Util::Processor
     processor_list
   end
 
-def self.enum_ioscan
-   processor_num=-1
-   processor_list={}
-   model = Facter.value(:architecture)
-   case model
-   when "ia64"
-     Thread::exclusive do
-       procs = Facter::Util::Resolution.exec('ioscan -fknCprocessor | grep processor')
-       if procs
-         proctype = Facter::Util::Resolution.exec('machinfo | grep Intel')
-         procs.each_line do |proc|
-           if proc =~/^processor\s+(\S+)\s+/
-             processor_num = $1.to_i
-                if proctype =~ /Intel\S+\s+(.*)/
-                  processor_list[processor_num] = $1
-                end
+  # TODO: document
+  def self.enum_ioscan
+     processor_list={}
+
+     model = Facter.value(:architecture)
+     case model
+     when "ia64"
+       Thread::exclusive do
+         procs = Facter::Util::Resolution.exec('ioscan -fknCprocessor | grep processor')
+         if procs
+           proctype = Facter::Util::Resolution.exec('machinfo | grep Intel')
+           procs.each_line do |proc|
+             if proc =~/^processor\s+(\S+)\s+/
+               processor_num = $1.to_i
+               if proctype =~ /Intel\S+\s+(.*)/
+                 processor_list[processor_num] = $1
+               end
+             end
            end
          end
-       end
+      end
     end
+
+    processor_list
   end
- processor_list
- end
 end

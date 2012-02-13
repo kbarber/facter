@@ -7,6 +7,7 @@
 #   Uses purely "uname -m" on all platforms other than AIX and Windows.
 #   On AIX uses the parsed "modelname" output of "lsattr -El sys0 -a modelname".
 #   On Windows uses the 'host_cpu' pulled out of Ruby's config.
+#   On HP-UX uses the 'model' command.
 #
 # Caveats:
 #
