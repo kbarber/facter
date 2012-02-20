@@ -8,7 +8,7 @@ def cpuinfo_fixture(filename)
 end
 
 def kstat_fixture(filename)
-  File.open(fixtures('kstat__cpu_info', filename)).readlines
+  File.open(fixtures('kstat__cpu_info', filename)).read
 end
 
 describe Facter::Util::Processor do
