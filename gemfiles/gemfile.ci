@@ -1,3 +1,5 @@
+source 'http://rubygems.org'
+
 # These are the base gems that facter requires for CI testing. This is a
 # duplicate of what the Puppetlabs Jenkins environment was running at the
 # time this file was created.
