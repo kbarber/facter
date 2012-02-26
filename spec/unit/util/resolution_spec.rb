@@ -295,4 +295,29 @@ describe Facter::Util::Resolution do
       Facter::Util::Resolution.exec("echo foo").should == "foo"
     end
   end
+
+  describe "have_which" do
+    before :each do
+      Facter::Util::Resolution.instance_variable_set("@have_which", nil)
+    end
+
+    it "on windows should always return false" do
+      Facter::Util::Config.stubs(:is_windows?).returns(true)
+      Facter::Util::Resolution.have_which.should == false
+    end
+
+    it "should return true if which exists" do
+      Facter::Util::Resolution.any_instance.stubs(:`).
+        with('which which >/dev/null 2>&1').returns("/my/path/to/which")
+      Process::Status.any_instance.stubs(:success?).returns(true)
+      Facter::Util::Resolution.have_which.should == true
+    end
+
+    it "should return false if which returns non-zero exit code" do
+      Facter::Util::Resolution.any_instance.stubs(:`).
+        with('which which >/dev/null 2>&1').returns(nil)
+      Process::Status.any_instance.stubs(:success?).returns(false)
+      Facter::Util::Resolution.have_which.should == false
+    end
+  end
 end
